@@ -28,24 +28,36 @@
   --bg: #171a14; --panel: #20251c; --ink: #e7e9df; --muted: #9ea48f; --line: #343b2d; --accent: #a7bd84; --ember: #ef9a62; --plate: #2a2d26; color-scheme: dark }
 
 * { box-sizing: border-box }
+html, body { height: 100% }
 body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 14px; line-height: 1.5 }
-.wrap { max-width: 1280px; margin: 0 auto; padding-block: 28px 48px;
+/* Desktop: one screen. Image fills the left, controls scroll inside the right sidebar. */
+.wrap { height: 100%; display: flex; flex-direction: column; padding-block: 14px;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
-header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; margin-bottom: 20px }
-h1 { font-family: var(--f-display); font-weight: 700; font-size: clamp(26px, 4vw, 38px); letter-spacing: -0.02em; margin: 0; text-wrap: balance }
+header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 24px; margin-bottom: 12px }
+h1 { font-family: var(--f-display); font-weight: 700; font-size: clamp(22px, 2.6vw, 30px); letter-spacing: -0.02em; margin: 0; text-wrap: balance }
 h1 span { color: var(--accent) }
-.sub { color: var(--muted); margin: 4px 0 0; max-width: 60ch }
-.grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; align-items: start }
-@media (max-width: 860px) { .grid { grid-template-columns: minmax(0, 1fr) } }
+.sub { color: var(--muted); margin: 2px 0 0; max-width: 70ch; font-size: 13px }
+.grid { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px }
 
-.stage { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); display: flex; flex-direction: column; gap: 12px; min-width: 0 }
-@media (max-width: 860px) { .stage { position: static } }
-.plate { position: relative; background: var(--plate); border: 1px solid var(--line); border-radius: 4px; padding: 14px;
-  display: grid; place-items: center; min-height: 280px; overflow: hidden }
+.stage { display: flex; flex-direction: column; gap: 10px; min-width: 0; min-height: 0 }
+.plate { position: relative; flex: 1; min-height: 0; background: var(--plate); border: 1px solid var(--line); border-radius: 4px; padding: 14px;
+  display: grid; place-items: center; overflow: hidden }
 .plate.drag { outline: 2px dashed var(--accent); outline-offset: -8px }
 .view { position: relative; max-width: 100%; line-height: 0 }
-.view canvas { max-width: 100%; max-height: 72vh; height: auto; display: block }
+.view canvas { max-width: 100%; max-height: calc(100dvh - 210px); height: auto; display: block }
 #orig { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none }
+aside { overflow-y: auto; min-height: 0; overscroll-behavior: contain }
+
+/* Phones and narrow windows: image pinned at the top, controls scroll underneath it. */
+@media (max-width: 860px) {
+  html, body { height: auto }
+  .wrap { height: auto }
+  .grid { grid-template-columns: minmax(0, 1fr) }
+  .stage { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); padding-bottom: 8px }
+  .plate { padding: 8px }
+  .view canvas { max-height: 38vh }
+  aside { overflow: visible }
+}
 .tag { position: absolute; top: 10px; left: 10px; font: 500 11px/1 var(--f-mono); letter-spacing: .08em; text-transform: uppercase;
   background: var(--panel); color: var(--muted); padding: 5px 7px; border-radius: 3px; border: 1px solid var(--line) }
 .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center }
@@ -65,6 +77,8 @@ button:focus-visible, .btn:focus-within, input:focus-visible, select:focus-visib
 .paste:focus:empty::before { content: "Ready: paste now" ; color: var(--accent) }
 
 aside { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; min-width: 0 }
+#compare { user-select: none; -webkit-user-select: none; touch-action: none }
+#compare[aria-pressed=true] { background: var(--accent); border-color: var(--accent); color: var(--panel) }
 details { border-top: 1px solid var(--line) }
 details:first-of-type { border-top: 0 }
 summary { list-style: none; cursor: pointer; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center;
@@ -92,7 +106,6 @@ input[type=text] { font: 13px var(--f-body); padding: 7px 9px; border: 1px solid
 </style>
 </head>
 <body>
-
 <div class="wrap">
   <header>
     <div>
@@ -115,10 +128,7 @@ input[type=text] { font: 13px var(--f-body); padding: 7px 9px; border: 1px solid
         </div>
       </div>
       <div class="bar">
-        <div class="grow">
-          <label for="compare">Compare original</label>
-          <input id="compare" type="range" min="0" max="100" value="0">
-        </div>
+        <button id="compare" type="button" aria-pressed="false" title="Shortcut: hold O">Hold to see original</button>
         <button id="reset" type="button">Reset to preset</button>
       </div>
       <div class="hint" id="status">Copy an image and paste it anywhere on the page to swap it in.</div>
@@ -317,8 +327,20 @@ input[type=text] { font: 13px var(--f-body); padding: 7px 9px; border: 1px solid
   plate.addEventListener("dragleave", () => plate.classList.remove("drag"));
   plate.addEventListener("drop", e => { e.preventDefault(); plate.classList.remove("drag"); loadFile(e.dataTransfer.files[0]); });
 
-  $("compare").addEventListener("input", e => { orig.style.clipPath = `inset(0 ${100 - e.target.value}% 0 0)`; });
-  orig.style.clipPath = "inset(0 100% 0 0)";
+  // Hold the button (or the O key) to flip instantly to the original; let go to return.
+  const cmp = $("compare");
+  const showOrig = on => { orig.hidden = !on; cmp.setAttribute("aria-pressed", on); };
+  showOrig(false);
+  cmp.addEventListener("pointerdown", e => { e.preventDefault(); cmp.setPointerCapture?.(e.pointerId); showOrig(true); });
+  for (const ev of ["pointerup", "pointercancel", "lostpointercapture"]) cmp.addEventListener(ev, () => showOrig(false));
+  cmp.addEventListener("keydown", e => { if ((e.key === " " || e.key === "Enter") && !e.repeat) { e.preventDefault(); showOrig(true); } });
+  cmp.addEventListener("keyup", e => { if (e.key === " " || e.key === "Enter") showOrig(false); });
+  cmp.addEventListener("contextmenu", e => e.preventDefault());
+  document.addEventListener("keydown", e => {
+    if ((e.key === "o" || e.key === "O") && !e.repeat && !e.metaKey && !e.ctrlKey && !e.target.closest("input, [contenteditable]")) showOrig(true);
+  });
+  document.addEventListener("keyup", e => { if (e.key === "o" || e.key === "O") showOrig(false); });
+  window.addEventListener("blur", () => showOrig(false));
 
   // ---------- sample beetle (drawn, so the page works before an upload) ----------
   function sample() {
@@ -498,5 +520,4 @@ input[type=text] { font: 13px var(--f-body); padding: 7px 9px; border: 1px solid
 </script>
 
 </body>
-
 </html>
