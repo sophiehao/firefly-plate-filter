@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Firefly Plate Filter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: specimen plate on the left (sticky), a lab-notebook control column on the right; stacks on phones. */
+:root {
+  --bg: #e3e5dc;
+  --panel: #f3f3ed;
+  --ink: #23281f;
+  --muted: #646b5b;
+  --line: #c9ccbf;
+  --accent: #5f7444;
+  --ember: #d9773f;
+  --plate: #ece9e4;
+  --f-display: "Bricolage Grotesque", "Helvetica Neue", Arial, sans-serif;
+  --f-body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #171a14; --panel: #20251c; --ink: #e7e9df; --muted: #9ea48f; --line: #343b2d; --accent: #a7bd84; --ember: #ef9a62; --plate: #2a2d26; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #171a14; --panel: #20251c; --ink: #e7e9df; --muted: #9ea48f; --line: #343b2d; --accent: #a7bd84; --ember: #ef9a62; --plate: #2a2d26; color-scheme: dark }
+
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 14px; line-height: 1.5 }
+.wrap { max-width: 1280px; margin: 0 auto; padding-block: 28px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; margin-bottom: 20px }
+h1 { font-family: var(--f-display); font-weight: 700; font-size: clamp(26px, 4vw, 38px); letter-spacing: -0.02em; margin: 0; text-wrap: balance }
+h1 span { color: var(--accent) }
+.sub { color: var(--muted); margin: 4px 0 0; max-width: 60ch }
+.grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; align-items: start }
+@media (max-width: 860px) { .grid { grid-template-columns: minmax(0, 1fr) } }
+
+.stage { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); display: flex; flex-direction: column; gap: 12px; min-width: 0 }
+@media (max-width: 860px) { .stage { position: static } }
+.plate { position: relative; background: var(--plate); border: 1px solid var(--line); border-radius: 4px; padding: 14px;
+  display: grid; place-items: center; min-height: 280px; overflow: hidden }
+.plate.drag { outline: 2px dashed var(--accent); outline-offset: -8px }
+.view { position: relative; max-width: 100%; line-height: 0 }
+.view canvas { max-width: 100%; max-height: 72vh; height: auto; display: block }
+#orig { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none }
+.tag { position: absolute; top: 10px; left: 10px; font: 500 11px/1 var(--f-mono); letter-spacing: .08em; text-transform: uppercase;
+  background: var(--panel); color: var(--muted); padding: 5px 7px; border-radius: 3px; border: 1px solid var(--line) }
+.bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center }
+.bar .grow { flex: 1 1 180px; display: flex; align-items: center; gap: 10px; min-width: 0 }
+.bar .grow label { font: 500 11px var(--f-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); white-space: nowrap }
+.hint { font: 12px var(--f-mono); color: var(--muted) }
+
+button, .btn { font: 500 13px var(--f-body); border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+  padding: 8px 14px; border-radius: 3px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px }
+button:hover, .btn:hover { border-color: var(--accent) }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--panel) }
+button:focus-visible, .btn:focus-within, input:focus-visible, select:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px }
+.paste { min-width: 210px; padding: 8px 14px; border: 1px dashed var(--accent); border-radius: 3px; background: var(--panel);
+  font: 500 13px var(--f-body); color: var(--ink); cursor: text; white-space: nowrap; overflow: hidden; caret-color: transparent; line-height: 1.4 }
+.paste:empty::before { content: "Copy an image, then press ⌘V / Ctrl+V"; color: var(--muted) }
+.paste:focus { outline: 2px solid var(--ember); outline-offset: 2px }
+.paste:focus:empty::before { content: "Ready: paste now" ; color: var(--accent) }
+
+aside { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; min-width: 0 }
+details { border-top: 1px solid var(--line) }
+details:first-of-type { border-top: 0 }
+summary { list-style: none; cursor: pointer; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center;
+  font: 600 13px var(--f-display); letter-spacing: .01em }
+summary::-webkit-details-marker { display: none }
+summary::after { content: "+"; font: 400 16px var(--f-mono); color: var(--muted) }
+details[open] summary::after { content: "–" }
+.sec { padding: 0 16px 16px; display: grid; gap: 12px }
+.row { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center }
+.row label { font-size: 13px }
+.row output { font: 12px var(--f-mono); color: var(--muted); font-variant-numeric: tabular-nums; min-width: 3.5ch; text-align: right }
+.row input[type=range] { grid-column: 1 / -1 }
+input[type=range] { width: 100%; accent-color: var(--accent) }
+.swatches { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px }
+.sw { display: grid; gap: 4px; font-size: 12px; color: var(--muted) }
+.sw input[type=color] { width: 100%; height: 34px; border: 1px solid var(--line); border-radius: 3px; padding: 2px; background: var(--panel); cursor: pointer }
+.presets { display: flex; flex-wrap: wrap; gap: 6px; padding: 14px 16px; border-bottom: 1px solid var(--line) }
+.presets button { padding: 6px 10px; font-size: 12px }
+.presets button[aria-pressed=true] { border-color: var(--accent); color: var(--accent); font-weight: 600 }
+.check { display: flex; gap: 8px; align-items: center; font-size: 13px }
+.check input { accent-color: var(--accent); width: 16px; height: 16px }
+input[type=text] { font: 13px var(--f-body); padding: 7px 9px; border: 1px solid var(--line); border-radius: 3px; background: var(--bg); color: var(--ink); width: 100% }
+#status { min-height: 1.5em }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Firefly <span>Plate</span> Filter</h1>
+      <p class="sub">Copy any image and paste it here (⌘V / Ctrl+V). It gets the specimen-plate look: olive-green wash, washed-out shadows, warm gold and pink highlights, fine grain on a pale paper ground.</p>
+    </div>
+    <div class="bar">
+      <div class="paste" id="pasteBox" contenteditable="true" role="textbox" aria-label="Paste an image here" spellcheck="false"></div>
+      <button id="save" class="primary" type="button">Save PNG</button>
+    </div>
+  </header>
+
+  <div class="grid">
+    <section class="stage">
+      <div class="plate" id="plate">
+        <span class="tag" id="srcTag">Sample beetle · paste an image to replace</span>
+        <div class="view" id="view">
+          <canvas id="out" aria-label="Filtered image"></canvas>
+          <canvas id="orig" aria-hidden="true"></canvas>
+        </div>
+      </div>
+      <div class="bar">
+        <div class="grow">
+          <label for="compare">Compare original</label>
+          <input id="compare" type="range" min="0" max="100" value="0">
+        </div>
+        <button id="reset" type="button">Reset to preset</button>
+      </div>
+      <div class="hint" id="status">Copy an image and paste it anywhere on the page to swap it in.</div>
+    </section>
+
+    <aside aria-label="Treatment controls">
+      <div class="presets" id="presets" role="group" aria-label="Presets"></div>
+
+      <details open>
+        <summary>Treatment levels</summary>
+        <div class="sec" id="levels"></div>
+      </details>
+
+      <details open>
+        <summary>Colors</summary>
+        <div class="sec">
+          <div class="swatches" id="colors"></div>
+        </div>
+      </details>
+
+      <details>
+        <summary>Wash &amp; fade</summary>
+        <div class="sec" id="wash"></div>
+      </details>
+
+      <details>
+        <summary>Background</summary>
+        <div class="sec">
+          <label class="check"><input type="checkbox" id="keyOn"> Replace plain background with paper</label>
+          <div id="bgctl"></div>
+          <div class="hint">Works best on product shots or cutouts with a fairly flat background. The background color is sampled from the image corners.</div>
+        </div>
+      </details>
+
+      <details>
+        <summary>Plate annotations</summary>
+        <div class="sec">
+          <label class="check"><input type="checkbox" id="ringOn"> Specimen ring and label</label>
+          <div>
+            <label for="labelTxt" style="font-size:13px">Label</label>
+            <input type="text" id="labelTxt" value="2. FEATURE 2">
+          </div>
+          <div id="annctl"></div>
+        </div>
+      </details>
+    </aside>
+  </div>
+</div>
+
+<script>
+(() => {
+  const MAX = 1600;
+  const $ = id => document.getElementById(id);
+
+  const SLIDERS = {
+    levels: [
+      ["intensity", "Overall treatment", 0, 100, "%"],
+      ["keep", "Keep photo detail", 0, 100, "%"],
+      ["sharp", "Detail sharpening", 0, 100, "%"],
+      ["tint", "Green gradient map", 0, 100, "%"],
+      ["desat", "Desaturate", 0, 100, "%"],
+      ["irid", "Iridescent highlights", 0, 100, "%"],
+      ["accentAmt", "Pink accent", 0, 100, "%"],
+      ["contrast", "Contrast", 40, 160, "%"],
+      ["bright", "Brightness", -40, 40, ""],
+      ["grain", "Grain", 0, 100, "%"],
+      ["sparkle", "Sparkle", 0, 100, "%"],
+    ],
+    wash: [
+      ["washAmt", "Wash strength", 0, 100, "%"],
+      ["washAngle", "Wash direction", 0, 360, "°"],
+      ["washStart", "Wash start", 0, 100, "%"],
+      ["ghost", "Ghost fade (opposite end)", 0, 100, "%"],
+      ["fade", "Overall fade to paper", 0, 60, "%"],
+    ],
+    bgctl: [
+      ["tol", "Key tolerance", 2, 60, ""],
+      ["soft", "Edge softness", 1, 40, ""],
+    ],
+    annctl: [
+      ["ringSize", "Ring size", 40, 100, "%"],
+    ],
+  };
+  const COLORS = [
+    ["shadow", "Shadows"], ["mid", "Midtones"], ["hi", "Highlights"],
+    ["accent", "Accent"], ["washCol", "Wash"], ["paper", "Paper"],
+    ["ringCol", "Ring"], ["labelCol", "Label"],
+  ];
+
+  const BASE = { intensity: 80, keep: 85, sharp: 30, tint: 55, desat: 35, irid: 55, accentAmt: 35, contrast: 85, bright: 4, grain: 14, sparkle: 8,
+    washAmt: 40, washAngle: 120, washStart: 30, ghost: 22, fade: 6, tol: 22, soft: 14, ringSize: 85,
+    shadow: "#3e4f30", mid: "#7e8d5c", hi: "#f2d2a8", accent: "#d9577a", washCol: "#6f8a52", paper: "#ece9e4",
+    ringCol: "#b49aa0", labelCol: "#111111" };
+  const PRESETS = {
+    "Firefly": {},
+    "Moss": { tint: 70, irid: 35, accentAmt: 20, washAmt: 55, shadow: "#2f3f26", mid: "#6a7d4a", hi: "#dfe0b6", washCol: "#5b7a40" },
+    "Dusk": { shadow: "#3a3550", mid: "#7f7a8f", hi: "#f3cfb4", accent: "#e0608c", washCol: "#6d6a8e", irid: 65, washAngle: 200 },
+    "Ember": { shadow: "#4a3226", mid: "#a17a52", hi: "#ffe0a6", accent: "#ef5a3c", washCol: "#9a6a3a", accentAmt: 60, desat: 30 },
+    "Faded": { intensity: 90, tint: 55, desat: 60, contrast: 70, fade: 18, grain: 14, ghost: 40, sparkle: 6 },
+    "Bold": { intensity: 100, keep: 40, sharp: 15, tint: 75, desat: 45, contrast: 85, grain: 28, sparkle: 22, washAmt: 60, washStart: 25, ghost: 30, fade: 8 },
+  };
+  let preset = "Firefly";
+  const S = { ...BASE, keyOn: true, ringOn: false, label: "2. FEATURE 2" };
+
+  // ---------- build controls ----------
+  const fmt = (k, v, u) => v + u;
+  for (const [box, list] of Object.entries(SLIDERS)) {
+    for (const [k, name, min, max, u] of list) {
+      const row = document.createElement("div"); row.className = "row";
+      row.innerHTML = `<label for="s-${k}">${name}</label><output id="o-${k}"></output>
+        <input type="range" id="s-${k}" min="${min}" max="${max}" step="1">`;
+      $(box).appendChild(row);
+      const inp = row.querySelector("input");
+      inp.addEventListener("input", () => { S[k] = +inp.value; $("o-" + k).textContent = fmt(k, S[k], u); schedule(); });
+    }
+  }
+  for (const [k, name] of COLORS) {
+    const w = document.createElement("label"); w.className = "sw";
+    w.innerHTML = `<input type="color" id="c-${k}">${name}`;
+    $("colors").appendChild(w);
+    w.querySelector("input").addEventListener("input", e => { S[k] = e.target.value; schedule(); });
+  }
+  for (const name of Object.keys(PRESETS)) {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = name;
+    b.addEventListener("click", () => applyPreset(name));
+    $("presets").appendChild(b);
+  }
+  function syncUI() {
+    for (const list of Object.values(SLIDERS)) for (const [k, , , , u] of list) {
+      $("s-" + k).value = S[k]; $("o-" + k).textContent = fmt(k, S[k], u);
+    }
+    for (const [k] of COLORS) $("c-" + k).value = S[k];
+    $("keyOn").checked = S.keyOn; $("ringOn").checked = S.ringOn;
+    for (const b of $("presets").children) b.setAttribute("aria-pressed", b.textContent === preset);
+  }
+  function applyPreset(name) { preset = name; Object.assign(S, BASE, PRESETS[name]); syncUI(); schedule(); }
+  $("reset").addEventListener("click", () => applyPreset(preset));
+  $("keyOn").addEventListener("change", e => { S.keyOn = e.target.checked; schedule(); });
+  $("ringOn").addEventListener("change", e => { S.ringOn = e.target.checked; schedule(); });
+  $("labelTxt").addEventListener("input", e => { S.label = e.target.value; schedule(); });
+
+  // ---------- source image ----------
+  const src = document.createElement("canvas"), sctx = src.getContext("2d", { willReadFrequently: true });
+  const out = $("out"), octx = out.getContext("2d");
+  const orig = $("orig"), gctx = orig.getContext("2d");
+  let srcData = null, bgRGB = [255, 255, 255];
+
+  function setSource(drawable, w, h, tag) {
+    const k = Math.min(1, MAX / Math.max(w, h));
+    const W = Math.round(w * k), H = Math.round(h * k);
+    for (const c of [src, out, orig]) { c.width = W; c.height = H; }
+    sctx.clearRect(0, 0, W, H); sctx.drawImage(drawable, 0, 0, W, H);
+    gctx.clearRect(0, 0, W, H); gctx.drawImage(drawable, 0, 0, W, H);
+    srcData = sctx.getImageData(0, 0, W, H);
+    bgRGB = sampleCorners(srcData);
+    $("srcTag").textContent = tag;
+    schedule();
+  }
+  function sampleCorners(img) {
+    const { width: W, height: H, data } = img, s = Math.max(2, Math.round(Math.min(W, H) * 0.03));
+    let r = 0, g = 0, b = 0, n = 0;
+    for (const [x0, y0] of [[0, 0], [W - s, 0], [0, H - s], [W - s, H - s]])
+      for (let y = y0; y < y0 + s; y++) for (let x = x0; x < x0 + s; x++) {
+        const i = (y * W + x) * 4; if (data[i + 3] < 10) continue;
+        r += data[i]; g += data[i + 1]; b += data[i + 2]; n++;
+      }
+    return n ? [r / n, g / n, b / n] : [255, 255, 255];
+  }
+
+  let pasteCount = 0;
+  function loadFile(f) {
+    if (!f || !f.type.startsWith("image/")) { $("status").textContent = "The clipboard doesn't hold an image. Copy an image itself (not its link), then paste again."; return; }
+    const url = URL.createObjectURL(f), im = new Image();
+    im.onload = () => {
+      pasteCount++;
+      setSource(im, im.naturalWidth, im.naturalHeight, "Pasted image " + pasteCount); URL.revokeObjectURL(url);
+      $("status").textContent = "Pasted image " + pasteCount + " (" + im.naturalWidth + "×" + im.naturalHeight + "). Paste again any time to swap it.";
+    };
+    im.onerror = () => { $("status").textContent = "Couldn't read that image. Try copying it again."; };
+    im.src = url;
+  }
+  // Paste works anywhere on the page (⌘V / Ctrl+V); the paste box gives phones a long-press target.
+  document.addEventListener("paste", e => {
+    const items = [...(e.clipboardData?.items || [])];
+    const it = items.find(i => i.type.startsWith("image/"));
+    const file = it ? it.getAsFile() : [...(e.clipboardData?.files || [])].find(f => f.type.startsWith("image/"));
+    if (e.target.closest && e.target.closest("input[type=text]") && !file) return;
+    e.preventDefault();
+    $("pasteBox").textContent = "";
+    loadFile(file);
+  });
+  $("pasteBox").addEventListener("input", () => { $("pasteBox").textContent = ""; });
+  $("pasteBox").addEventListener("drop", e => e.preventDefault());
+  const plate = $("plate");
+  plate.addEventListener("dragover", e => { e.preventDefault(); plate.classList.add("drag"); });
+  plate.addEventListener("dragleave", () => plate.classList.remove("drag"));
+  plate.addEventListener("drop", e => { e.preventDefault(); plate.classList.remove("drag"); loadFile(e.dataTransfer.files[0]); });
+
+  $("compare").addEventListener("input", e => { orig.style.clipPath = `inset(0 ${100 - e.target.value}% 0 0)`; });
+  orig.style.clipPath = "inset(0 100% 0 0)";
+
+  // ---------- sample beetle (drawn, so the page works before an upload) ----------
+  function sample() {
+    const W = 1200, H = 900, c = document.createElement("canvas"); c.width = W; c.height = H;
+    const x = c.getContext("2d");
+    x.fillStyle = "#fbfbf9"; x.fillRect(0, 0, W, H);
+    x.translate(560, 470); x.rotate(0.42);
+    x.strokeStyle = "#1e1a14"; x.lineCap = "round";
+    const leg = (pts, w) => { x.lineWidth = w; x.beginPath(); x.moveTo(...pts[0]); for (const p of pts.slice(1)) x.lineTo(...p); x.stroke(); };
+    leg([[-200, -40], [-260, -170], [-230, -300]], 16); leg([[-200, 40], [-280, 140], [-370, 150]], 16);
+    leg([[-40, -80], [-20, -210], [60, -330]], 15); leg([[-40, 80], [-60, 200], [-10, 290]], 15);
+    leg([[100, -80], [140, -160]], 14); leg([[100, 80], [130, 160]], 14);
+    x.lineWidth = 5; x.beginPath(); x.moveTo(-330, -40); x.quadraticCurveTo(-420, -200, -470, -420); x.stroke();
+    x.beginPath(); x.moveTo(-330, 40); x.quadraticCurveTo(-470, 120, -560, 300); x.stroke();
+    // elytra
+    let g = x.createLinearGradient(0, -130, 0, 130);
+    g.addColorStop(0, "#2a1d12"); g.addColorStop(.5, "#3a2a1a"); g.addColorStop(1, "#1d140c");
+    x.fillStyle = g; x.beginPath(); x.ellipse(110, 0, 330, 140, 0, 0, Math.PI * 2); x.fill();
+    for (const y of [-70, 10, 75]) {
+      g = x.createLinearGradient(-200, 0, 420, 0); g.addColorStop(0, "#ffcf7a"); g.addColorStop(.6, "#e08a3a"); g.addColorStop(1, "rgba(200,110,40,0)");
+      x.strokeStyle = g; x.lineWidth = 9; x.beginPath(); x.moveTo(-180, y * 0.8); x.quadraticCurveTo(110, y * 1.15, 400, y * 0.35); x.stroke();
+    }
+    x.strokeStyle = "#140e08"; x.lineWidth = 3; x.beginPath(); x.moveTo(-210, 0); x.lineTo(440, 0); x.stroke();
+    // pronotum
+    g = x.createRadialGradient(-280, -20, 10, -270, 0, 140);
+    g.addColorStop(0, "#e2365a"); g.addColorStop(.35, "#b8304a"); g.addColorStop(.7, "#f3d27c"); g.addColorStop(1, "#c8a35a");
+    x.fillStyle = g; x.beginPath(); x.ellipse(-260, 0, 95, 130, 0, 0, Math.PI * 2); x.fill();
+    x.fillStyle = "#18120c"; x.beginPath(); x.ellipse(-345, 0, 30, 42, 0, 0, Math.PI * 2); x.fill();
+    // speckle texture
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    const d = x.getImageData(0, 0, W, H);
+    for (let i = 0; i < d.data.length; i += 4) if (d.data[i] < 245) { const n = (Math.random() - .5) * 40; d.data[i] += n; d.data[i + 1] += n; d.data[i + 2] += n; }
+    x.putImageData(d, 0, 0);
+    setSource(c, W, H, "Sample beetle · paste an image to replace");
+  }
+
+  // ---------- the treatment ----------
+  const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
+  const ss = (a, b, v) => { const t = Math.min(1, Math.max(0, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
+  const lum = (r, g, b) => 0.299 * r + 0.587 * g + 0.114 * b;
+  // separable box blur of luminance, used to pull fine detail back out of the photo
+  function blurLum(D, W, H, r) {
+    const a = new Float32Array(W * H), b = new Float32Array(W * H);
+    for (let p = 0, i = 0; p < W * H; p++, i += 4) a[p] = lum(D[i], D[i + 1], D[i + 2]) / 255;
+    const n = 2 * r + 1;
+    for (let y = 0; y < H; y++) {
+      const o = y * W; let s = 0;
+      for (let x = -r; x <= r; x++) s += a[o + Math.min(W - 1, Math.max(0, x))];
+      for (let x = 0; x < W; x++) { b[o + x] = s / n; s += a[o + Math.min(W - 1, x + r + 1)] - a[o + Math.max(0, x - r)]; }
+    }
+    for (let x = 0; x < W; x++) {
+      let s = 0;
+      for (let y = -r; y <= r; y++) s += b[Math.min(H - 1, Math.max(0, y)) * W + x];
+      for (let y = 0; y < H; y++) { a[y * W + x] = s / n; s += b[Math.min(H - 1, y + r + 1) * W + x] - b[Math.max(0, y - r) * W + x]; }
+    }
+    return a;
+  }
+  let pending = false;
+  function schedule() { if (!pending) { pending = true; requestAnimationFrame(() => { pending = false; render(); }); } }
+
+  function render() {
+    if (!srcData) return;
+    const { width: W, height: H, data: D } = srcData;
+    const img = octx.createImageData(W, H), O = img.data;
+    const sh = hex(S.shadow), md = hex(S.mid), hi = hex(S.hi), ac = hex(S.accent), wc = hex(S.washCol), pp = hex(S.paper);
+    const I = S.intensity / 100, T = S.tint / 100, DS = S.desat / 100, IR = S.irid / 100, AC = S.accentAmt / 100;
+    const CT = S.contrast / 100, BR = S.bright / 100, GR = S.grain / 100 * 0.22, SP = S.sparkle / 100;
+    const WA = S.washAmt / 100, WS = S.washStart / 100, GH = S.ghost / 100, FD = S.fade / 100;
+    const ang = S.washAngle * Math.PI / 180, ax = Math.cos(ang), ay = Math.sin(ang);
+    const span = Math.abs(ax) * W + Math.abs(ay) * H, off = (Math.min(0, ax) * W + Math.min(0, ay) * H);
+    const bg = bgRGB.map(v => v / 255), tol = S.tol / 100, soft = S.soft / 100;
+    const KD = S.keep / 100, SH = S.sharp / 100 * 2.5;
+    const acL = lum(...ac), wcL = lum(...wc);
+    const BL = SH ? blurLum(D, W, H, Math.max(2, Math.round(Math.min(W, H) / 220))) : null;
+    let seed = 1234567;
+    const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+
+    for (let y = 0, i = 0; y < H; y++) {
+      for (let x = 0; x < W; x++, i += 4) {
+        const r = D[i] / 255, g = D[i + 1] / 255, b = D[i + 2] / 255, a = D[i + 3] / 255;
+        // how much of this pixel is subject (vs. flat background)
+        let m = a;
+        if (S.keyOn) {
+          const dr = r - bg[0], dg = g - bg[1], db = b - bg[2];
+          m *= ss(tol, tol + soft, Math.sqrt(dr * dr + dg * dg + db * db) / 1.732);
+        }
+        const L = 0.299 * r + 0.587 * g + 0.114 * b;
+        let L2 = Math.min(1, Math.max(0, (L - 0.5) * CT + 0.5 + BR));
+        // desaturated original, luminance shifted to L2
+        const sh2 = L2 - L;
+        let cr = r + (L - r) * DS + sh2, cg = g + (L - g) * DS + sh2, cb = b + (L - b) * DS + sh2;
+        // three-stop gradient map, then shifted back to the photo's own brightness so tones and detail survive
+        let gr, gg, gb;
+        if (L2 < 0.5) { const t = L2 * 2; gr = sh[0] + (md[0] - sh[0]) * t; gg = sh[1] + (md[1] - sh[1]) * t; gb = sh[2] + (md[2] - sh[2]) * t; }
+        else { const t = (L2 - 0.5) * 2; gr = md[0] + (hi[0] - md[0]) * t; gg = md[1] + (hi[1] - md[1]) * t; gb = md[2] + (hi[2] - md[2]) * t; }
+        { const d = (L2 - lum(gr, gg, gb)) * KD; gr += d; gg += d; gb += d; }
+        // keep original color where highlights are bright and saturated (the gold / pink sheen)
+        const sat = Math.max(r, g, b) - Math.min(r, g, b);
+        const keep = Math.min(1, IR * ss(0.3, 0.75, L) * (0.4 + sat * 1.6));
+        const tt = T * (1 - keep);
+        let nr = cr + (gr - cr) * tt, ng = cg + (gg - cg) * tt, nb = cb + (gb - cb) * tt;
+        // pink accent on reddish areas
+        const red = Math.min(1, Math.max(0, (r - Math.max(g, b)) * 3)) * AC;
+        if (red > 0) {
+          const k = 0.55 + 0.7 * L2, d = L2 - acL;
+          const tr = ac[0] * k * (1 - KD) + (ac[0] + d) * KD, tg = ac[1] * k * (1 - KD) + (ac[1] + d) * KD, tb = ac[2] * k * (1 - KD) + (ac[2] + d) * KD;
+          nr += (tr - nr) * red; ng += (tg - ng) * red; nb += (tb - nb) * red;
+        }
+        // overall treatment amount
+        nr = r + (nr - r) * I; ng = g + (ng - g) * I; nb = b + (nb - b) * I;
+        // directional green wash + ghost fade at the opposite end
+        const t = ((x * ax + y * ay) - off) / span;
+        const w = ss(WS, 1, t) * WA * I;
+        if (w > 0) {
+          const cl = lum(nr, ng, nb), k = 0.5 + 0.65 * cl, d = cl - wcL;
+          const tr = wc[0] * k * (1 - KD) + (wc[0] + d) * KD, tg = wc[1] * k * (1 - KD) + (wc[1] + d) * KD, tb = wc[2] * k * (1 - KD) + (wc[2] + d) * KD;
+          nr += (tr - nr) * w; ng += (tg - ng) * w; nb += (tb - nb) * w;
+        }
+        // local detail: add back fine luminance texture from the photo
+        if (SH) { const dd = (L - BL[i >> 2]) * SH * I; nr += dd; ng += dd; nb += dd; }
+        const fd = Math.min(1, FD + GH * Math.pow(1 - t, 2.2) * 0.85) * I;
+        nr += (pp[0] - nr) * fd; ng += (pp[1] - ng) * fd; nb += (pp[2] - nb) * fd;
+        // grain + sparkle
+        const n = (rnd() - 0.5) * GR * I;
+        nr += n; ng += n * 0.95; nb += n * 0.9;
+        if (SP && L > 0.35 && rnd() < SP * 0.04 * L) { const s = 0.12 + rnd() * 0.25; nr += s; ng += s * 0.92; nb += s * 0.95; }
+        // composite on paper
+        const mm = S.keyOn ? m : 1, base = S.keyOn ? pp : [r, g, b];
+        const fr = base[0] + (nr - base[0]) * mm, fg = base[1] + (ng - base[1]) * mm, fb = base[2] + (nb - base[2]) * mm;
+        O[i] = fr * 255; O[i + 1] = fg * 255; O[i + 2] = fb * 255;
+        O[i + 3] = S.keyOn ? 255 : D[i + 3];
+      }
+    }
+    octx.putImageData(img, 0, 0);
+    annotate(W, H);
+  }
+
+  function annotate(W, H) {
+    const u = Math.min(W, H);
+    if (S.ringOn) {
+      const R = u * S.ringSize / 200;
+      octx.save(); octx.strokeStyle = S.ringCol; octx.lineWidth = Math.max(1.2, u * 0.0025);
+      octx.beginPath(); octx.arc(W / 2, H / 2, R, 0, Math.PI * 2); octx.stroke(); octx.restore();
+    }
+    if (S.ringOn && S.label.trim()) {
+      const fs = Math.round(u * 0.04);
+      octx.save(); octx.fillStyle = S.labelCol; octx.textAlign = "right"; octx.textBaseline = "top";
+      octx.font = `400 ${fs}px "Helvetica Neue", Arial, sans-serif`;
+      octx.fillText(S.label.toUpperCase(), W - u * 0.03, H * 0.3); octx.restore();
+    }
+  }
+
+  // ---------- save ----------
+  let downloads = null;
+  $("save").addEventListener("click", () => {
+    out.toBlob(async blob => {
+      if (!blob) return;
+      if (!downloads) {
+        // Outside the Claude viewer (e.g. on your own site) a normal download link works.
+        const a = document.createElement("a"), url = URL.createObjectURL(blob);
+        a.href = url; a.download = "firefly-plate.png"; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+        $("status").textContent = "Saved firefly-plate.png.";
+        return;
+      }
+      try { await downloads.save({ filename: "firefly-plate.png", data: blob }); $("status").textContent = "Saved firefly-plate.png."; }
+      catch (e) { $("status").textContent = e && e.code === "declined" ? "Save cancelled." : "Couldn't save the file here."; }
+    }, "image/png");
+  });
+  (async () => {
+    try { downloads = window.claude?.use ? await window.claude.use("downloads") : null; } catch { downloads = null; }
+  })();
+
+  syncUI();
+  sample();
+})();
+</script>
+
+</body>
+
+</html>
