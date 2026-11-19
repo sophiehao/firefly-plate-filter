@@ -37,19 +37,24 @@ header { display: flex; flex-wrap: wrap; align-items: center; justify-content: s
 h1 { font-family: var(--f-display); font-weight: 700; font-size: clamp(22px, 2.6vw, 30px); letter-spacing: -0.02em; margin: 0; text-wrap: balance }
 h1 span { color: var(--accent) }
 .sub { color: var(--muted); margin: 2px 0 0; max-width: 70ch; font-size: 13px }
-.grid { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px }
+.grid { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) clamp(220px, 34vw, 340px); gap: 16px }
+@media (max-width: 860px) {
+  .grid { gap: 10px }
+  .wrap { padding-block: 10px }
+  .sub { display: none }
+}
 
 .stage { display: flex; flex-direction: column; gap: 10px; min-width: 0; min-height: 0 }
 .plate { position: relative; flex: 1; min-height: 0; background: var(--plate); border: 1px solid var(--line); border-radius: 4px; padding: 14px;
   display: grid; place-items: center; overflow: hidden }
 .plate.drag { outline: 2px dashed var(--accent); outline-offset: -8px }
 .view { position: relative; max-width: 100%; line-height: 0 }
-.view canvas { max-width: 100%; max-height: calc(100dvh - 210px); height: auto; display: block }
+.view canvas { max-width: 100%; max-height: calc(100dvh - 190px); height: auto; display: block }
 #orig { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none }
 aside { overflow-y: auto; min-height: 0; overscroll-behavior: contain }
 
-/* Phones and narrow windows: image pinned at the top, controls scroll underneath it. */
-@media (max-width: 860px) {
+/* Phones only: image pinned at the top, controls scroll underneath it. */
+@media (max-width: 560px) {
   html, body { height: auto }
   .wrap { height: auto }
   .grid { grid-template-columns: minmax(0, 1fr) }
@@ -103,6 +108,13 @@ input[type=range] { width: 100%; accent-color: var(--accent) }
 input[type=text] { font: 13px var(--f-body); padding: 7px 9px; border: 1px solid var(--line); border-radius: 3px; background: var(--bg); color: var(--ink); width: 100% }
 #status { min-height: 1.5em }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important } }
+/* Narrow windows: tighter sidebar so it still fits beside the image. */
+@media (max-width: 860px) {
+  summary { padding: 10px 12px }
+  .sec, .presets { padding-left: 12px; padding-right: 12px }
+  .swatches { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+  .paste { min-width: 0 }
+}
 </style>
 </head>
 <body>
